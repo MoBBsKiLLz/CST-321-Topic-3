@@ -1,84 +1,86 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <stdio.h>
 #include <signal.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 
 #define N 10
 
-char buffer[N];
-int writeIndx = 0;
-int readIndx = 0;
-int count = 0;
 
-int ParentProcess(char letter) {
+struct CIRCULAR_BUFFER {
+    int buffer[N];
+    int writer;
+    int reader;
+    int count;
+};
+struct CIRCULAR_BUFFER *buffer = NULL;
 
-    if(count == N - 1) {
+int put(int item) {
+    if ((buffer->writer + 1) % N == buffer->reader) {
         return 0; // Buffer is full
     }
-
-    buffer[writeIndx] = letter;
-    writeIndx = (writeIndx + 1)  % N;
-    count++;
-    
+    buffer->buffer[buffer->writer] = item;
+    buffer->writer = (buffer->writer + 1) % N;
     return 1;
 }
 
-int get(char* letter) {
-    if (readIndx == writeIndx) {
+int get(int* value) {
+    if (buffer->reader == buffer->writer) {
         return 0; // Buffer is empty
     }
-
-    *letter = buffer[readIndx];
-    readIndx = (readIndx + 1) % N;
-    count--;
-
-    printf("Got letter %c\n", *letter);
+    *value = buffer->buffer[buffer->reader];
+    buffer->reader = (buffer->reader + 1) % N;
+    printf("Got letter %c\n", *value);
     return 1;
 }
 
-void ChildProcess(){
-    int size = count;
-    for(int i = 0; i < size; i++) {
-        get(&buffer[i]);
-        sleep(1);
+void readBufferMessage() {
+    int i = 0;
+    while(get(&buffer->buffer[i])){
+        i++;
     }
 }
 
-void charavail(int signum) {
-    ChildProcess();
+void handle_sigusr1(int signum) {
+    readBufferMessage();
 }
 
-void complete(int signum) {
-    exit(1);
+void handle_sigusr2(int signum) {
+    exit(0);
 }
 
-void main() {
-    signal(SIGUSR1, charavail);
-    signal(SIGUSR2, complete);
-    pid_t pid = fork();
+void main(){
+    buffer = (struct CIRCULAR_BUFFER*)mmap(0, sizeof(buffer), PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    buffer->count = 0;
+    buffer->reader = 0;
+    buffer->writer = 0;
+
+    signal(SIGUSR1, handle_sigusr1);
+    signal(SIGUSR2, handle_sigusr2);
+
+    int pid = fork();
+    if (pid == -1) {
+        printf("Fork failed.\n");
+    }
 
     if (pid == 0) {
-        wait(NULL);
-    } 
-    
-    char word[] = "Miguel";
-    int length = sizeof(word) / sizeof(word[0]);
-    for (int i = 0; i < length; i++) {
-        ParentProcess(word[i]);
-
-        if (i == 1) {
-            kill(pid, SIGUSR1);
-            printf("Character available.\n");
-        } else if (i == length - 1) {
-            ParentProcess('\0');
-            kill(pid, SIGUSR2);
-            printf("End of string.\n");
+        while(1);
+        exit(1);
+    } else {
+        char message[] = "Miguel";
+        int length = sizeof(message) / sizeof(message[0]);
+        for (int i = 0; i < length; i++) {
+            put(message[i]);
+            if(i == 1) {
+                kill(pid, SIGUSR1);
+            }
+            if (i == length - 1) {
+                sleep(1);
+                kill(pid, SIGUSR2);
+            }
         }
-
-        sleep(1);
+        exit(1);
     }
-
-    exit(1);     
 }
