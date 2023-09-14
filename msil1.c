@@ -30,8 +30,15 @@ int get(int* value) {
     return 1;
 }
 
-void read_message() {
+void readBufferMessage() {
+    int i = 0;
+    while(get(&buffer[i])){
+        i++;
+    }
+}
 
+void handle_sigusr1(int signum) {
+    readBufferMessage();
 }
 
 void main(){
@@ -42,7 +49,7 @@ void main(){
 
     if (pid == 0) {
         printf("Child process created.\n");
-        signal(SIGUSR1, read_message);
+        signal(SIGUSR1, handle_sigusr1);
     } else {
         printf("Parent process created.\n");
         char message[] = "Miguel";
