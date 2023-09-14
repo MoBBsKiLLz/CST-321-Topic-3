@@ -2,37 +2,43 @@
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
 
 #define N 10
 
-int buffer[N];
-int writer = 0;
-int reader = 0;
+
+struct CIRCULAR_BUFFER {
+    int buffer[N];
+    int writer;
+    int reader;
+    int count;
+};
+struct CIRCULAR_BUFFER *buffer = NULL;
 
 int put(int item) {
-    if ((writer + 1) % N == reader) {
-        printf("Buffer is full!");
-        return 0;
+    if ((buffer->writer + 1) % N == buffer->reader) {
+        return 0; // Buffer is full
     }
-    buffer[writer] = item;
-    writer = (writer + 1) % N;
+    buffer->buffer[buffer->writer] = item;
+    buffer->writer = (buffer->writer + 1) % N;
     return 1;
 }
 
 int get(int* value) {
-    if (reader == writer) {
-        printf("Buffer is empty!");
-        return 0;
+    if (buffer->reader == buffer->writer) {
+        return 0; // Buffer is empty
     }
-    *value = buffer[reader];
-    reader = (reader + 1) % N;
+    *value = buffer->buffer[buffer->reader];
+    buffer->reader = (buffer->reader + 1) % N;
     printf("Got letter %c\n", *value);
     return 1;
 }
 
 void readBufferMessage() {
     int i = 0;
-    while(get(&buffer[i])){
+    while(get(&buffer->buffer[i])){
         i++;
     }
 }
@@ -41,7 +47,19 @@ void handle_sigusr1(int signum) {
     readBufferMessage();
 }
 
+void handle_sigusr2(int signum) {
+    exit(0);
+}
+
 void main(){
+    buffer = (struct CIRCULAR_BUFFER*)mmap(0, sizeof(buffer), PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    buffer->count = 0;
+    buffer->reader = 0;
+    buffer->writer = 0;
+
+    signal(SIGUSR1, handle_sigusr1);
+    signal(SIGUSR2, handle_sigusr2);
+
     int pid = fork();
     if (pid == -1) {
         printf("Fork failed.\n");
@@ -49,7 +67,8 @@ void main(){
 
     if (pid == 0) {
         printf("Child process created.\n");
-        signal(SIGUSR1, handle_sigusr1);
+        while(1);
+        exit(1);
     } else {
         printf("Parent process created.\n");
         char message[] = "Miguel";
@@ -59,6 +78,11 @@ void main(){
             if(i == 1) {
                 kill(pid, SIGUSR1);
             }
+            if (i == length - 1) {
+                sleep(5);
+                kill(pid, SIGUSR2);
+            }
         }
+        exit(1);
     }
 }
