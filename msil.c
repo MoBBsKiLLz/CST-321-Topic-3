@@ -25,7 +25,7 @@ int ParentProcess(char letter) {
     return 1;
 }
 
-int ChildProcess(char* letter) {
+int get(char* letter) {
     if (readIndx == writeIndx) {
         return 0; // Buffer is empty
     }
@@ -38,12 +38,16 @@ int ChildProcess(char* letter) {
     return 1;
 }
 
-void charavail(int signum) {
+void ChildProcess(){
     int size = count;
     for(int i = 0; i < size; i++) {
-        ChildProcess(&buffer[i]);
+        get(&buffer[i]);
         sleep(1);
     }
+}
+
+void charavail(int signum) {
+    ChildProcess();
 }
 
 void complete(int signum) {
