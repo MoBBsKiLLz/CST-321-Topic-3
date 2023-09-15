@@ -6,6 +6,7 @@
 #define THREAD_NUM 2
 
 int count = 0;
+int finalCount = 0;
 
 pthread_mutex_t countMutex;
 
@@ -17,19 +18,22 @@ void* counter(void* arg) {
         count++;
         pthread_mutex_unlock(&countMutex);
     }
-    sleep(1);
     printf("The count for the counter is: %d\n", count);
+    finalCount = count;
 }
 
 void* monitor(void* arg) {
     int seconds = (*(int*)arg) * 60;
     int misses = 0;
     for (int i = 0; i < seconds; i+=3) {
-        pthread_mutex_lock(&countMutex);
+        pthread_mutex_trylock(&countMutex);
         misses++;
         printf("The count for the monitor is: %d\n", count);
         pthread_mutex_unlock(&countMutex);
         sleep(3);
+        if (finalCount == count) {
+            break;
+        }
     }
     printf("Number of misses: %d\n", misses);
 }
