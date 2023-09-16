@@ -52,7 +52,7 @@ void main(){
         pthread_join(t1, (void**) &res);
         if(*res == 1) {
             char ans;
-            fprintf(fptr, "Semahore not available to Parent.\n");
+            fprintf(fptr, "Semaphore not available to Parent.\n");
             fprintf(fptr, "Parent is starved.\n");
             fclose(fptr);
             printf("Would you like to kill the child process? ");
