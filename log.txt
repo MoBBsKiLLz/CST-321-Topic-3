@@ -1,0 +1,3 @@
+Parent process is running.
+Semahore not available to Parent.
+Parent is starved.

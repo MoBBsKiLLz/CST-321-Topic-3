@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <semaphore.h>
 #include <pthread.h>
 
@@ -17,6 +18,7 @@ void* sleepyThread() {
     *resultFail = fail;
     *resultPass = pass;
     sleep(10);
+    printf("Check log file.\n");
     if (sem_wait(&semShared) == 0) {
         return (void*) resultFail;
     }
@@ -26,35 +28,42 @@ void* sleepyThread() {
 void main(){
     sem_init(&semShared, 1, 1);
 
-    FILE *fptr = fopen("log.txt", "w");
-    if (fptr == NULL) {
-        printf("Could not open file");
-    }
-
     pid_t pid = fork();
+
+    FILE *fptr = fopen("log.txt", "w");
 
     if (pid == 0) {
         // Child Process
         fprintf(fptr, "Child process is running.\n");
         sem_wait(&semShared);
+        fprintf(fptr, "Semaphore acquired by Child.\n");
         while(count < 60) {
             sleep(1);
+            fprintf(fptr, "Waiting in child process for %d second/s.\n", count + 1);
             count++;
         }
         sem_post(&semShared);
     } else {
         // Parent Process
+        fprintf(fptr, "Parent process is running.\n");
         pthread_t t1;
         int* res;
-        // The threads routine can instead prompt the user to check the file for the availability of the semaphore.
         pthread_create(&t1, NULL, &sleepyThread, NULL);
         pthread_join(t1, (void**) &res);
         if(*res == 1) {
-            kill(pid, SIGKILL);
-            int ppost = sem_post(&semShared);
+            char ans;
+            fprintf(fptr, "Semahore not available to Parent.\n");
+            fprintf(fptr, "Parent is starved.\n");
+            fclose(fptr);
+            printf("Would you like to kill the child process? ");
+            scanf("%c", &ans);
+            if (ans == 'y') {
+                kill(pid, SIGKILL);
+                int ppost = sem_post(&semShared);
+            }
         }
         if (sem_wait(&semShared) == 0) {
-            printf("...Semaphore acquired by Parent\n");
+            printf("Semaphore acquired by Parent\n");
         }
         sem_post(&semShared);
         free(res);
