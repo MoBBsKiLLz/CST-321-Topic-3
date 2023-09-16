@@ -1,3 +1,6 @@
-Parent process is running.
-Semaphore not available to Parent.
-Parent is starved.
+[2023-09-16 11:54:12] Parent process is running.
+[2023-09-16 11:54:12] Child process is running.
+[2023-09-16 11:54:12] Semaphore acquired by Child.
+[2023-09-16 11:54:22] Semaphore not available to Parent.
+[2023-09-16 11:54:22] Parent is starved.
+[2023-09-16 11:54:32] Semaphore acquired by Parent
